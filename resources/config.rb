@@ -1,15 +1,15 @@
-property :conf_source, String, default: lazy { node['varnish']['conf_source'] }
-property :conf_cookbook, String, default: lazy { node['varnish']['conf_cookbook'] }
-property :conf_path, String, default: lazy { node['varnish']['conf_path'] }
+# frozen_string_literal: true
+
+property :conf_source, String, default: 'default.erb'
+property :conf_cookbook, String
+property :conf_path, String, default: lazy { platform_family?('debian') ? '/etc/default/varnish' : '/etc/sysconfig/varnish' }
 
 # Service config options
 property :start_on_boot, [true, false], default: true
 property :max_open_files, Integer, default: 131_072
 property :max_locked_memory, Integer, default: 82_000
 property :instance_name, String, default: VarnishCookbook::Helpers.hostname
-property :major_version, Float, equal_to: [3.0, 4.0, 4.1, 5, 5.0, 5.1, 5.2, 6.0, 6.1], default: lazy {
-  VarnishCookbook::Helpers.installed_major_version
-}
+property :major_version, Float, equal_to: [6.1, 6.2, 6.3, 6.4], default: 6.4
 
 # Daemon options
 property :listen_address, String, default: '0.0.0.0'
@@ -36,31 +36,26 @@ property :parameters, Hash, default:
       'thread_pool_timeout' => '300',
     }
 property :path_to_secret, String, default: '/etc/varnish/secret'
-property :reload_cmd, String, default: lazy { node['varnish']['reload_cmd'] }
+property :reload_cmd, String, default: '/usr/sbin/varnishreload'
 
 action :configure do
   extend VarnishCookbook::Helpers
-  systemd_daemon_reload if node['init_package'] == 'systemd'
+  systemd_daemon_reload
 
   malloc_default = percent_of_total_mem(node['memory']['total'], new_resource.malloc_percent)
 
   template '/etc/varnish/varnish.params' do
+    cookbook 'varnish'
     action :create
     variables(
       major_version: new_resource.major_version,
       malloc_size: new_resource.malloc_size || malloc_default,
       config: new_resource
     )
-    cookbook 'varnish'
-    only_if { node['init_package'] == 'systemd' }
   end
 
   service 'varnish' do
-    supports restart: true, reload: true if new_resource.major_version < 5
-
-    # https://github.com/varnishcache/varnish-cache/issues/2316
-    supports restart: false, reload: true if new_resource.major_version >= 5
-
+    supports restart: false, reload: true
     action :nothing
   end
 
@@ -77,6 +72,7 @@ action :configure do
   # This is needed on Ubuntu 16.04 since reload-vcl currently breaks with systemd
   # Should be fixed with https://github.com/varnishcache/pkg-varnish-cache/pull/70
   template '/etc/default/varnish' do
+    only_if { platform_family?('debian') }
     path '/etc/default/varnish'
     source 'default.erb'
     cookbook 'varnish'
@@ -88,20 +84,17 @@ action :configure do
       malloc_size: new_resource.malloc_size || malloc_default,
       config: new_resource
     )
-    only_if { node['init_package'] == 'systemd' }
-    only_if { platform_family?('debian') }
   end
 
   execute 'generate secret file' do
     command "dd if=/dev/random of=#{new_resource.path_to_secret} count=1"
     creates new_resource.path_to_secret
-    only_if { new_resource.major_version >= 6.1 }
   end
 
   template new_resource.conf_path do
     path new_resource.conf_path
     source new_resource.conf_source
-    cookbook new_resource.conf_cookbook
+    cookbook new_resource.conf_cookbook || 'varnish'
     owner 'root'
     group 'root'
     mode '0644'
@@ -111,6 +104,6 @@ action :configure do
       config: new_resource
     )
     notifies :restart, 'service[varnish]', :delayed
-    notifies :run, 'execute[systemctl-daemon-reload]', :immediately if node['init_package'] == 'systemd'
+    notifies :run, 'execute[systemctl-daemon-reload]', :immediately
   end
 end
