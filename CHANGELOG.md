@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- resolved cookstyle error: resources/varnish_repo_debian.rb:1:1 refactor: `Chef/Deprecations/ResourceWithoutUnifiedTrue`
+- resolved cookstyle error: resources/varnish_repo_redhat.rb:1:1 refactor: `Chef/Deprecations/ResourceWithoutUnifiedTrue`
+- resolved cookstyle error: resources/vcl_file.rb:1:1 refactor: `Chef/Deprecations/ResourceWithoutUnifiedTrue`
+- resolved cookstyle error: resources/vcl_template.rb:1:1 refactor: `Chef/Deprecations/ResourceWithoutUnifiedTrue`
 - resolved cookstyle error: test/fixtures/cookbooks/disable_ipv6/metadata.rb:1:1 convention: `Style/Encoding`
 - resolved cookstyle error: test/fixtures/cookbooks/disable_ipv6/recipes/default.rb:1:1 convention: `Style/Encoding`
 - resolved cookstyle error: test/fixtures/cookbooks/disable_ipv6/recipes/disable_ipv6.rb:1:1 convention: `Style/Encoding`
